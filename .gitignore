@@ -1,0 +1,8 @@
+.venv/
+__pycache__/
+.pytest_cache/
+raw/
+data/
+state/
+logs/
+*.tmp
