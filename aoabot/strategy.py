@@ -15,6 +15,7 @@ from dataclasses import dataclass
 
 import pandas as pd
 
+KST = pd.Timedelta(hours=9)
 
 @dataclass
 class Params:
@@ -27,6 +28,8 @@ class Params:
     add_at_atr: float = 1.0      # 첫 진입가보다 ATR × add_at_atr 만큼 유리해지면 추가 진입
     add_frac: float = 0.5        # 추가 진입 수량 = 첫 진입 수량 × add_frac
     max_adds: int = 1
+    follow_trend: bool = False   # True면 급변과 같은 방향으로 진입 (진단: 워뇨띠는 급락 뒤 노출을 줄이고 급등 뒤 늘렸다)
+    entry_hours_kst: list[int] | None = None  # 이 한국 시각(봉 마감 기준)에만 신규 진입. None이면 24시간
 
 
 @dataclass
@@ -85,6 +88,8 @@ def decide(row: pd.Series, pos: Position | None, equity: float, p: Params) -> De
                 return Add(add_qty, pos.init_px, "수익 방향 추가 진입, 손절가를 첫 진입가로 올림")
         return None
 
+    if p.entry_hours_kst is not None and (row.name + KST).hour not in p.entry_hours_kst:
+        return None
     if row["vol_regime"] < p.vol_gate:
         return None
     if row["r_4h"] <= -p.move_th:
@@ -93,6 +98,8 @@ def decide(row: pd.Series, pos: Position | None, equity: float, p: Params) -> De
         side = -1
     else:
         return None
+    if p.follow_trend:
+        side = -side
     stop_dist = p.stop_atr * atr_px
     qty = min(p.risk_per_trade * equity / stop_dist, p.max_leverage * equity / px)
     reason = f"4시간 {row['r_4h']:+.1%}, 변동성 레짐 {row['vol_regime']:.2f}"

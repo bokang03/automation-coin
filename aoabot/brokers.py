@@ -20,12 +20,22 @@ def make_exchange(cfg: dict, with_keys: bool) -> ccxt.Exchange:
     return ex
 
 
-def fetch_closed_bars(ex: ccxt.Exchange, symbol: str, limit: int = 1000) -> pd.DataFrame:
-    """마감된 1시간봉만 돌려준다. timestamp는 봉 마감 시각(UTC) — 백테스트 데이터와 같은 기준."""
-    rows = ex.fetch_ohlcv(symbol, "1h", limit=limit)
-    c = pd.DataFrame(rows, columns=["t", "open", "high", "low", "close", "volume"])
-    c["timestamp"] = pd.to_datetime(c.t, unit="ms", utc=True) + pd.Timedelta(hours=1)
-    return c[c.timestamp <= pd.Timestamp.now(tz="UTC")].drop(columns="t").reset_index(drop=True)
+def fetch_closed_bars(ex: ccxt.Exchange, symbol: str, limit: int = 1500, timeframe: str = "1h") -> pd.DataFrame:
+    """마감된 봉만 돌려준다. timestamp는 봉 마감 시각(UTC) — 백테스트 데이터와 같은 기준.
+    1시간봉은 50일 이동평균(1,200봉)을 계산할 수 있도록 1,500봉을 받는다. 거래소가 한 번에 주는 개수가 적으면 나눠 받는다."""
+    step = pd.Timedelta(ex.parse_timeframe(timeframe), unit="s")
+    step_ms = int(step.total_seconds() * 1000)
+    now = pd.Timestamp.now(tz="UTC")
+    since, rows = int((now - step * (limit + 1)).timestamp() * 1000), []
+    while True:
+        batch = ex.fetch_ohlcv(symbol, timeframe, since=since, limit=1000)
+        rows += batch
+        if len(batch) < 2 or batch[-1][0] + step_ms > now.timestamp() * 1000:
+            break
+        since = batch[-1][0] + step_ms
+    c = pd.DataFrame(rows, columns=["t", "open", "high", "low", "close", "volume"]).drop_duplicates("t")
+    c["timestamp"] = pd.to_datetime(c.t, unit="ms", utc=True) + step
+    return c[c.timestamp <= now].drop(columns="t").reset_index(drop=True)
 
 
 class PaperBroker:

@@ -1,4 +1,5 @@
 # 모의매매가 기본이다. 실매매는 mode: live 로 바꾸고 --live 옵션까지 줘야 실제 주문이 나간다.
+algorithm: timing        # timing = 워뇨띠의 5분봉 급락 매수 타이밍 / policy = 1시간봉 행동 복제 / rules = 처음 만든 규칙 봇
 mode: paper              # paper | live
 exchange: binanceusdm    # ccxt 거래소 id (바이낸스 USDT 무기한 선물)
 demo: false              # true 면 바이낸스 데모 계정(가짜 돈)으로 실제 주문 흐름을 시험
@@ -12,6 +13,17 @@ paper:
   fee: 0.0005
   slippage: 0.0002
 
+timing:                  # algorithm: timing 일 때. 설명은 aoabot/timing.py 의 TimingParams, 근거는 README
+  size: 0.42             # 한 번 진입 크기(자산 대비). 워뇨띠가 중앙값 이상으로 산 봉의 크기 중앙값
+  max_lev: 0.42          # 포지션 상한. size 와 같으면 추가 진입 없음
+  hold_bars: 48          # 4시간(5분봉 48개) 뒤 청산. 워뇨띠의 매수 뒤 반등이 정점에 이르는 시간
+  min_prior: 1           # 직전 4시간 안에 강한 매수 신호가 1번 이상 있었을 때만 진입 (폭락의 첫 신호는 건너뜀)
+  prior_window: 48
+  entry: taker           # 시장가 진입
+
+weekly:                  # algorithm: timing 과 함께 도는 주봉 전략 (aoabot/weekly.py, models/aoa_tf_1w.json)
+  enabled: true          # 워뇨띠가 크게 팔던 모양의 주봉이 마감되면 1주일 롱 (워뇨띠와 반대 방향), 크기는 자산의 1배
+
 strategy:                # 설명은 aoabot/strategy.py 의 Params
   move_th: 0.03
   vol_gate: 1.6
@@ -22,7 +34,12 @@ strategy:                # 설명은 aoabot/strategy.py 의 Params
   add_at_atr: 1.0
   add_frac: 0.5
   max_adds: 1
+  follow_trend: false
+  # 한국 시각(1시간봉 마감 기준)에 신규 진입을 허용할 시각. 워뇨띠의 진입 손익이 2018~2021 네 해 모두
+  # 플러스였던 4~7시, 16~19시, 20~23시 (scripts/09_apply_timing.py). null 이면 24시간
+  entry_hours_kst: [4, 5, 6, 7, 16, 17, 18, 19, 20, 21, 22, 23]
 
 risk:
   daily_loss: 0.03
   max_drawdown: 0.25
+  max_entries_per_day: 4   # 워뇨띠 2020~2021 거래일의 하루 라운드트립 90백분위

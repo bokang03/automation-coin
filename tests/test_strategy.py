@@ -71,3 +71,23 @@ def test_backtest_stop_fills_at_stop_price():
     _, tr, _ = run(c, Params(vol_gate=0.0), risk.Limits(), fee=0, slip=0)
     assert len(tr) == 1 and tr.iloc[0].side == 1 and tr.iloc[0].reason == "손절"
     assert tr.iloc[0].exit == pytest.approx(80.0)                     # 갭 하락이면 시가에 체결
+
+
+def test_entry_only_in_allowed_kst_hours():
+    p = Params(entry_hours_kst=[4, 5])
+    utc_19 = pd.Timestamp("2024-01-01 19:00")   # 한국 04시
+    utc_03 = pd.Timestamp("2024-01-01 03:00")   # 한국 12시
+    assert isinstance(decide(row(r_4h=-0.05, t=utc_19), None, 10_000, p), Enter)
+    assert decide(row(r_4h=-0.05, t=utc_03), None, 10_000, p) is None
+    # 보유 중인 포지션의 청산은 시각과 무관
+    assert isinstance(decide(row(t=utc_03 + pd.Timedelta(hours=12)), pos(t=utc_03), 10_000, p), Exit)
+
+
+def test_daily_entry_cap_resets_next_day():
+    lim = risk.Limits(max_entries_per_day=2)
+    rs = risk.RiskState()
+    risk.update(rs, "2024-01-01", 10_000, lim)
+    risk.record_entry(rs); risk.record_entry(rs)
+    assert not risk.can_open(rs, 10_000, lim)[0]
+    risk.update(rs, "2024-01-02", 10_000, lim)
+    assert risk.can_open(rs, 10_000, lim)[0]

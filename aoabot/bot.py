@@ -123,7 +123,7 @@ class Bot:
                         self._close(s, "손절")
 
         equity = self.broker.equity(self.positions)
-        risk.update(self.rs, now.strftime("%Y-%m-%d"), equity, self.limits)
+        risk.update(self.rs, (now + pd.Timedelta(hours=9)).strftime("%Y-%m-%d"), equity, self.limits)  # 한국 날짜 기준
         if self.rs.halted:
             for s in list(self.positions):
                 self._close(s, "최대 낙폭 정지")
@@ -159,6 +159,7 @@ class Bot:
                 log.info("%s 진입 신호 무시: %s", s, why)
                 return
             px = self.broker.market(s, d.side, d.qty)
+            risk.record_entry(self.rs)
             stop = px - d.side * abs(row.px - d.stop_px)
             self.positions[s] = p = Position(s, d.side, d.qty, px, px, d.qty, stop, d.atr_px, row.name.isoformat())
             notify(f"[{mode}] {s} {'롱' if d.side > 0 else '숏'} 진입 {d.qty:.4f} @ {px:,.1f}, 손절 {stop:,.1f} ({d.reason})")
@@ -195,9 +196,16 @@ def main() -> None:
     if a.live != (cfg.get("mode") == "live"):
         raise SystemExit("실매매는 config.yaml 의 mode: live 와 --live 옵션이 둘 다 있어야 합니다.")
     setup_logging()
-    bot = Bot(cfg, live)
-    log.info("시작: %s, 거래소 %s%s, 종목 %s", "실매매" if live else "모의매매", cfg["exchange"],
-             " (데모 계정)" if cfg.get("demo") else "", bot.symbols)
+    if cfg.get("algorithm", "rules") == "timing":
+        from aoabot.timing_bot import TimingBot
+        bot = TimingBot(cfg, live)
+    elif cfg.get("algorithm") == "policy":
+        from aoabot.policy_bot import PolicyBot
+        bot = PolicyBot(cfg, live)
+    else:
+        bot = Bot(cfg, live)
+    log.info("시작: %s, 알고리즘 %s, 거래소 %s%s, 종목 %s", "실매매" if live else "모의매매", cfg.get("algorithm", "rules"),
+             cfg["exchange"], " (데모 계정)" if cfg.get("demo") else "", bot.symbols)
     while True:
         try:
             bot.step()

@@ -6,9 +6,11 @@ from __future__ import annotations
 
 import argparse
 from dataclasses import asdict
+from pathlib import Path
 
 import numpy as np
 import pandas as pd
+import yaml
 
 from aoabot import risk
 from aoabot.features import make_features
@@ -52,7 +54,7 @@ def run(candles: pd.DataFrame, p: Params, lim: risk.Limits, start=None, end=None
             gap = row.open < pos.stop_px if pos.side == 1 else row.open > pos.stop_px
             close(t, row.open if gap else pos.stop_px, "손절")
         equity = cash + (pos.side * pos.qty * (row.px - pos.entry_px) if pos else 0.0)
-        risk.update(rs, t.strftime("%Y-%m-%d"), equity, lim)
+        risk.update(rs, (t + pd.Timedelta(hours=9)).strftime("%Y-%m-%d"), equity, lim)  # 한국 날짜 기준
         if rs.halted:
             if pos is not None:
                 close(t, row.px, "최대 낙폭 정지")
@@ -62,6 +64,7 @@ def run(candles: pd.DataFrame, p: Params, lim: risk.Limits, start=None, end=None
         if isinstance(d, Enter):
             ok, _ = risk.can_open(rs, equity, lim)
             if ok:
+                risk.record_entry(rs)
                 fp = fill(d.side, d.qty, row.px)
                 pos = Position(symbol, d.side, d.qty, fp, fp, d.qty, d.stop_px, d.atr_px, t.isoformat())
         elif isinstance(d, Add):
@@ -109,13 +112,25 @@ def main():
     ap.add_argument("--start")
     ap.add_argument("--end")
     ap.add_argument("--fee", type=float, default=0.0005, help="편도 수수료 (바이낸스 선물 시장가 0.05%%)")
+    ap.add_argument("--slip", type=float, default=0.0002, help="편도 슬리피지")
     ap.add_argument("--trades", help="거래 목록을 저장할 csv 경로")
-    for k, v in asdict(Params()).items():
-        ap.add_argument(f"--{k}", type=type(v), default=v)
+    ap.add_argument("--config", default=str(Path(__file__).resolve().parent.parent / "config.yaml"),
+                    help="봇과 같은 strategy/risk 설정을 읽는다. 아래 옵션으로 개별 값을 덮어쓴다")
+    ap.add_argument("--all_hours", action="store_true", help="진입 시각 제한을 끈다")
+    pre, _ = ap.parse_known_args()
+    cfg = yaml.safe_load(Path(pre.config).read_text(encoding="utf-8")) if Path(pre.config).exists() else {}
+    base = Params(**cfg.get("strategy", {}))
+    for k, v in asdict(base).items():
+        if isinstance(v, bool):
+            ap.add_argument(f"--{k}", action=argparse.BooleanOptionalAction, default=v)
+        elif isinstance(v, (int, float)):
+            ap.add_argument(f"--{k}", type=type(v), default=v)
     a = ap.parse_args()
-    p = Params(**{k: getattr(a, k) for k in asdict(Params())})
+    p = Params(**{k: getattr(a, k, v) for k, v in asdict(base).items()})
+    if a.all_hours:
+        p.entry_hours_kst = None
     c = load_candles(a.paths)
-    eq, tr, _ = run(c, p, risk.Limits(), a.start, a.end, fee=a.fee)
+    eq, tr, _ = run(c, p, risk.Limits(**cfg.get("risk", {})), a.start, a.end, fee=a.fee, slip=a.slip)
     bench = c.set_index(c.timestamp.dt.tz_localize(None)).close
     print(summarize(eq, tr, bench))
     if a.trades:

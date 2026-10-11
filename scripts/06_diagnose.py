@@ -72,19 +72,19 @@ print("② 봇의 진입 조건(변동성≥1.6, 4시간 ±3% 역방향)에서 �
 cond = (rt.vol_regime >= 1.6) & (rt.r_4h.abs() >= 0.03)
 counter = cond & (np.sign(rt.r_4h) == -rt.dir)
 follow = cond & (np.sign(rt.r_4h) == rt.dir)
-print(f"봇 조건에 해당하는 그의 진입: {cond.sum()}건 ({cond.mean():.1%}), 손익 {rt.btc[cond].sum():,.0f} BTC ({rt.btc[cond].sum() / total_btc:.1%})")
+print(f"봇 조건에 해당하는 워뇨띠의 진입: {cond.sum()}건 ({cond.mean():.1%}), 손익 {rt.btc[cond].sum():,.0f} BTC ({rt.btc[cond].sum() / total_btc:.1%})")
 print(f"  그중 역추세(봇과 같은 방향) {counter.sum()}건 손익 {rt.btc[counter].sum():+,.0f} BTC, 승률 {(rt.btc[counter] > 0).mean():.0%}")
 print(f"  그중 추세추종(봇과 반대)   {follow.sum()}건 손익 {rt.btc[follow].sum():+,.0f} BTC, 승률 {(rt.btc[follow] > 0).mean():.0%}")
 hours_long = (f.vol_regime >= 1.6) & (f.r_4h <= -0.03)
 hours_short = (f.vol_regime >= 1.6) & (f.r_4h >= 0.03)
 dnet = f.net.shift(-4) - f.net
 print(f"봇 조건 발생 시간: 롱 신호 {hours_long.sum()}시간, 숏 신호 {hours_short.sum()}시간 (전체 {len(f)}시간)")
-print(f"  롱 신호 후 4시간 그의 순노출 변화 평균 {dnet[hours_long].mean():+.3f}배 (늘린 비율 {(dnet[hours_long] > 0.05).mean():.0%}, 줄인 비율 {(dnet[hours_long] < -0.05).mean():.0%})")
-print(f"  숏 신호 후 4시간 그의 순노출 변화 평균 {dnet[hours_short].mean():+.3f}배 (줄인 비율 {(dnet[hours_short] < -0.05).mean():.0%}, 늘린 비율 {(dnet[hours_short] > 0.05).mean():.0%})")
+print(f"  롱 신호 후 4시간 워뇨띠의 순노출 변화 평균 {dnet[hours_long].mean():+.3f}배 (늘린 비율 {(dnet[hours_long] > 0.05).mean():.0%}, 줄인 비율 {(dnet[hours_long] < -0.05).mean():.0%})")
+print(f"  숏 신호 후 4시간 워뇨띠의 순노출 변화 평균 {dnet[hours_short].mean():+.3f}배 (줄인 비율 {(dnet[hours_short] < -0.05).mean():.0%}, 늘린 비율 {(dnet[hours_short] > 0.05).mean():.0%})")
 print(f"  (평소 4시간 순노출 변화 평균 {dnet.mean():+.3f}배)")
 
 print("=" * 100)
-print("③ 수수료: 그는 수수료를 냈나, 받았나")
+print("③ 수수료: 워뇨띠는 수수료를 냈나, 받았나")
 t = x.copy(); t["year"] = t.ts.dt.year
 t["notional_btc"] = t.lastqty / t.lastpx
 fee = t.groupby("year").agg(수수료BTC=("execcomm", lambda s: s.sum() / 1e8), 거래대금BTC=("notional_btc", "sum"),
@@ -93,11 +93,11 @@ fee["실효수수료율"] = fee.수수료BTC / fee.거래대금BTC
 fu = tr[(tr.symbol == "XBTUSD")]
 print(fee.round(5))
 print(f"수수료율 분포: {t.commission.value_counts().head(4).to_dict()}  (음수 = 리베이트를 받음)")
-print(f"그의 라운드트립 수익률 중앙값 {rt.ret.median():+.3%}  vs  봇 왕복 비용 0.14% (수수료 0.05%×2 + 슬리피지 0.02%×2)")
-print(f"수익률이 0.14% 미만인 그의 이익 거래: {((rt.ret > 0) & (rt.ret < 0.0014)).sum()}건 / 이익 거래 {(rt.ret > 0).sum()}건")
+print(f"워뇨띠의 라운드트립 수익률 중앙값 {rt.ret.median():+.3%}  vs  봇 왕복 비용 0.14% (수수료 0.05%×2 + 슬리피지 0.02%×2)")
+print(f"수익률이 0.14% 미만인 워뇨띠의 이익 거래: {((rt.ret > 0) & (rt.ret < 0.0014)).sum()}건 / 이익 거래 {(rt.ret > 0).sum()}건")
 
 print("=" * 100)
-print("④ 봇의 손절(ATR×3)·12시간 청산이 그의 거래에 적용됐다면")
+print("④ 봇의 손절(ATR×3)·12시간 청산이 워뇨띠의 거래에 적용됐다면")
 def mae(r):
     bars = f.loc[r.open.floor("h") + pd.Timedelta(hours=1): r.close.ceil("h")]
     if bars.empty or np.isnan(r.atr24):
@@ -123,7 +123,7 @@ lb = f.net > 0.25; sb = f.net < -0.25
 print(f"시간 기준 순노출: 순롱 {lb.mean():.0%}, 중립 {(~lb & ~sb).mean():.0%}, 순숏 {sb.mean():.0%}  → 봇은 롱/숏을 대칭으로 다룸")
 
 print("=" * 100)
-print("⑥ 같은 시기(2020~2021) 봇의 거래와 그의 실제 포지션 비교")
+print("⑥ 같은 시기(2020~2021) 봇의 거래와 워뇨띠의 실제 포지션 비교")
 bt = pd.read_csv("data/bt_btc_2020_2026.csv", parse_dates=["opened", "closed"])
 bt = bt[bt.opened < "2022-01-01"].copy()
 fn = f.net
@@ -131,11 +131,11 @@ bt["his_net"] = fn.reindex(bt.opened).values
 bt["his_dnet"] = (fn.shift(-4) - fn).reindex(bt.opened).values
 agree = np.sign(bt.his_dnet.where(bt.his_dnet.abs() > 0.05, 0)) == bt.side
 print(f"봇 거래 {len(bt)}건(2020~2021), 봇 손익 {bt.pnl.sum():+,.0f} USDT")
-print(f"  진입 후 4시간 동안 그도 같은 방향으로 순노출을 늘린 경우 {agree.mean():.0%}, 반대로 움직인 경우 {(np.sign(bt.his_dnet.where(bt.his_dnet.abs() > 0.05, 0)) == -bt.side).mean():.0%}, 변화 없음 {(bt.his_dnet.abs() <= 0.05).mean():.0%}")
-print(f"  봇 숏 진입 시점 그의 순노출 평균 {bt.his_net[bt.side < 0].mean():+.2f}배, 봇 롱 진입 시점 {bt.his_net[bt.side > 0].mean():+.2f}배")
+print(f"  진입 후 4시간 동안 워뇨띠도 같은 방향으로 순노출을 늘린 경우 {agree.mean():.0%}, 반대로 움직인 경우 {(np.sign(bt.his_dnet.where(bt.his_dnet.abs() > 0.05, 0)) == -bt.side).mean():.0%}, 변화 없음 {(bt.his_dnet.abs() <= 0.05).mean():.0%}")
+print(f"  봇 숏 진입 시점 워뇨띠의 순노출 평균 {bt.his_net[bt.side < 0].mean():+.2f}배, 봇 롱 진입 시점 {bt.his_net[bt.side > 0].mean():+.2f}배")
 
 print("=" * 100)
-print("⑦ 그의 우위는 얼마나 빨리 사라지나: 그의 순노출 방향을 N시간 늦게 따라 할 때")
+print("⑦ 워뇨띠의 우위는 얼마나 빨리 사라지나: 워뇨띠의 순노출 방향을 N시간 늦게 따라 할 때")
 fwd = np.log(f.px).shift(-1) - np.log(f.px)
 y = pd.Series(np.select([f.net > 0.25, f.net < -0.25], [1, -1], 0), f.index)
 for lag in (0, 1, 2, 4, 8, 24):
